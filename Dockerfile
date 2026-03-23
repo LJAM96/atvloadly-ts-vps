@@ -8,7 +8,7 @@ RUN npm ci
 COPY ./web/static ./
 RUN npm run build
 
-FROM golang:1.22-bullseye AS go-builder
+FROM golang:1.24-bullseye AS go-builder
 ARG TARGETOS=linux
 ARG TARGETARCH
 WORKDIR /src
