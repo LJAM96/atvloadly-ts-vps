@@ -1,3 +1,42 @@
+FROM node:20-bullseye AS frontend-builder
+WORKDIR /src
+COPY ./locales ./locales
+WORKDIR /src/web/static
+COPY ./web/static/package.json ./package.json
+COPY ./web/static/package-lock.json ./package-lock.json
+RUN npm ci
+COPY ./web/static ./
+RUN npm run build
+
+FROM golang:1.22-bullseye AS go-builder
+ARG TARGETOS=linux
+ARG TARGETARCH
+WORKDIR /src
+COPY ./go.mod ./go.mod
+COPY ./go.sum ./go.sum
+RUN go mod download
+COPY ./cmd ./cmd
+COPY ./doc ./doc
+COPY ./internal ./internal
+COPY ./locales ./locales
+COPY ./main.go ./main.go
+COPY ./web ./web
+COPY --from=frontend-builder /src/web/static/dist ./web/static/dist
+RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /out/atvloadly ./main.go
+
+FROM rust:bookworm AS appletvpair-builder
+WORKDIR /build
+COPY ./tools/appletvpair/Cargo.toml ./Cargo.toml
+COPY ./tools/appletvpair/src ./src
+RUN cargo build --release
+
+FROM ubuntu:22.04 AS pmd3-builder
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get -y install \
+    python3 python3-pip python3-venv build-essential libssl-dev libffi-dev
+RUN python3 -m venv /opt/pmd3
+RUN /opt/pmd3/bin/pip install --upgrade pip setuptools wheel
+RUN /opt/pmd3/bin/pip install pymobiledevice3==9.5.1
+
 FROM ubuntu:22.04
 ARG APP_NAME
 ARG VERSION
@@ -10,7 +49,7 @@ RUN echo "I'm building for $TARGETPLATFORM"
 
 # Install dependencies
 RUN apt-get update && apt-get -y install \
-    wget unzip libavahi-compat-libdnssd-dev curl
+    wget unzip libavahi-compat-libdnssd-dev curl python3 python3-venv
 
 RUN case ${TARGETARCH} in \
          "amd64")  PKG_ARCH=x86_64  ;; \
@@ -60,8 +99,13 @@ RUN cd /tmp && rm -rf ./*.deb && rm -rf ./*.tar.gz && rm -rf ./*.zip && rm -rf .
 # The add command will automatically decompress the file.
 RUN mkdir -p /keep
 COPY ./doc/config.yaml.example /keep/config.yaml
-COPY ./build/${APP_NAME}-${TARGETOS}-${TARGETARCH} /usr/bin/${APP_NAME}
+COPY --from=go-builder /out/atvloadly /usr/bin/${APP_NAME}
+COPY --from=appletvpair-builder /build/target/release/appletvpair /usr/bin/appletvpair
+COPY --from=pmd3-builder /opt/pmd3 /opt/pmd3
+COPY ./tools/appletvremote/appletvremote.py /usr/bin/appletvremote
 RUN chmod +x /usr/bin/${APP_NAME}
+RUN chmod +x /usr/bin/appletvpair
+RUN chmod +x /usr/bin/appletvremote
 
 # The lockdown records have been moved to /data.
 RUN rm -rf /var/lib/lockdown && mkdir -p /data/lockdown && ln -s /data/lockdown /var/lib/lockdown
@@ -73,10 +117,13 @@ COPY ./doc/scripts/usbmuxd /etc/init.d/usbmuxd
 RUN chmod +x /etc/init.d/usbmuxd
 RUN printf '#!/bin/sh \n\n\
 
+mkdir -p $HOME \n\
 mkdir -p /data/lockdown \n\
+mkdir -p /data/pymobiledevice3 \n\
 mkdir -p /data/PlumeImpactor \n\
 mkdir -p $HOME/.config \n\
 [ ! -e "$HOME/.config/PlumeImpactor" ] && ln -s /data/PlumeImpactor $HOME/.config/PlumeImpactor \n\
+[ ! -e "$HOME/.pymobiledevice3" ] && ln -s /data/pymobiledevice3 $HOME/.pymobiledevice3 \n\
 
 if [ -d "/keep/lib" ]; then  \n\
     rm -rf /data/PlumeImpactor/lib \n\

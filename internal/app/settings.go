@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/bitxeno/atvloadly/internal/log"
+	"github.com/bitxeno/atvloadly/internal/model"
 	"github.com/bitxeno/atvloadly/internal/utils"
 )
 
@@ -70,6 +71,9 @@ type SettingsConfiguration struct {
 		HTTPProxy    string `koanf:"http_proxy" json:"http_proxy"`
 		HTTPSProxy   string `koanf:"https_proxy" json:"https_proxy"`
 	} `koanf:"network" json:"network"`
+	Devices struct {
+		Direct []model.DirectDevice `koanf:"direct" json:"direct"`
+	} `koanf:"devices" json:"devices"`
 }
 
 func SaveSettings() {

@@ -217,7 +217,10 @@ func HandlePairMessage(c *websocket.Conn) {
 		switch msg.Type {
 		case model.MessageTypePair:
 			udid := msg.Data
-			go runPairMessage(websocketMgr, pairMgr, udid)
+			go runPairMessage(websocketMgr, pairMgr, manager.PairOptions{UDID: udid})
+		case model.MessageTypePairDirect:
+			ip := msg.Data
+			go runPairMessage(websocketMgr, pairMgr, manager.PairOptions{IP: ip})
 		case model.MessageTypePairConfirm:
 			code := msg.Data
 			pairMgr.Write([]byte(code + "\n"))
@@ -228,11 +231,17 @@ func HandlePairMessage(c *websocket.Conn) {
 	}
 }
 
-func runPairMessage(mgr *manager.WebsocketManager, pairMgr *manager.PairManager, udid string) {
-	err := pairMgr.Start(mgr.Context(), udid)
+func runPairMessage(mgr *manager.WebsocketManager, pairMgr *manager.PairManager, options manager.PairOptions) {
+	err := pairMgr.Start(mgr.Context(), options)
 	if err != nil {
 		msg := fmt.Sprintf("ERROR: %s", err.Error())
 		mgr.WriteMessage(msg)
 		return
 	}
+
+	if err := manager.RestartUsbmuxd(); err != nil {
+		log.Warnf("Failed to restart usbmuxd after pairing: %v", err)
+	}
+	time.Sleep(time.Second)
+	manager.StartDeviceManager()
 }

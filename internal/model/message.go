@@ -9,6 +9,7 @@ const (
 
 	MessageTypePair        = 1
 	MessageTypePairConfirm = 2
+	MessageTypePairDirect  = 3
 )
 
 // Message Websocket Communication data format

@@ -2,6 +2,7 @@ package manager
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -65,6 +66,10 @@ func (t *InstallManager) TryStart(ctx context.Context, opts InstallOptions) erro
 			return fmt.Errorf("%s %s %w", t.ErrorLog(), err.Error(), ErrAccountInvalid)
 		}
 
+		if _, ok := GetDirectDeviceByUDID(opts.UDID); ok {
+			return err
+		}
+
 		// AppleTV system has reboot/lockdownd sleep, try restart usbmuxd to fix
 		// LOCKDOWN_E_MUX_ERROR / AFC_E_MUX_ERROR /
 		ipaName := filepath.Base(opts.IpaPath)
@@ -81,6 +86,7 @@ func (t *InstallManager) TryStart(ctx context.Context, opts InstallOptions) erro
 
 func (t *InstallManager) Start(ctx context.Context, opts InstallOptions) error {
 	t.outputStdout.Reset()
+	t.ProvisioningProfile = nil
 
 	// set execute timeout 30 miniutes
 	timeout := 30 * time.Minute
@@ -94,10 +100,18 @@ func (t *InstallManager) Start(ctx context.Context, opts InstallOptions) error {
 		}
 	}()
 
+	if directDevice, ok := GetDirectDeviceByUDID(opts.UDID); ok {
+		return t.startDirectInstall(ctx, opts, provisionPath, *directDevice)
+	}
+
 	if err := CheckAfcServiceStatus(opts.UDID); err != nil {
 		return fmt.Errorf("afc service not available: %w", err)
 	}
 
+	return t.startLegacyInstall(ctx, opts, provisionPath)
+}
+
+func (t *InstallManager) startLegacyInstall(ctx context.Context, opts InstallOptions, provisionPath string) error {
 	args := []string{"sign", "--apple-id", "--register-and-install", "--output-provision", provisionPath, "--udid", opts.UDID, "-u", opts.Account, "-p", opts.IpaPath}
 	if opts.RemoveExtensions {
 		args = append(args, "--remove-extensions")
@@ -105,39 +119,75 @@ func (t *InstallManager) Start(ctx context.Context, opts InstallOptions) error {
 	if opts.RefreshMode {
 		args = append(args, "--refresh")
 	}
-	cmd := exec.CommandContext(ctx, "plumesign", args...)
-	cmd.Dir = app.Config.Server.DataDir
-	cmd.Env = GetRunEnvs()
-	cmd.Stdout = t.outputStdout
-	cmd.Stderr = t.outputStdout
 
-	var err error
-	t.stdin, err = cmd.StdinPipe()
-	if err != nil {
-		log.Err(err).Msg("Error creating stdin pipe: ")
+	if err := t.runCommand(ctx, true, "plumesign", args...); err != nil {
 		return err
 	}
+
+	t.loadProvisioningProfile(provisionPath)
+
+	return nil
+}
+
+func (t *InstallManager) startDirectInstall(ctx context.Context, opts InstallOptions, provisionPath string, directDevice model.DirectDevice) error {
+	if directDevice.Host == "" || directDevice.RemoteIdentifier == "" {
+		return errors.New("direct device metadata is incomplete")
+	}
+	if err := t.ensureAccountDeviceRegistered(opts.Account, opts.UDID, directDevice.Name); err != nil {
+		return err
+	}
+
+	signedIpaPath := filepath.Join(os.TempDir(), fmt.Sprintf("signed-%d.ipa", time.Now().UnixNano()))
 	defer func() {
-		_ = t.stdin.Close()
+		if _, err := os.Stat(signedIpaPath); err == nil {
+			_ = os.Remove(signedIpaPath)
+		}
 	}()
 
-	if err := cmd.Start(); err != nil {
-		if errors.Is(err, context.DeadlineExceeded) {
-			_ = cmd.Process.Kill()
-			log.Err(err).Msgf("Installation exceeded %d-minute timeout limit. %s", int(timeout.Minutes()), t.ErrorLog())
-			err = fmt.Errorf("Installation exceeded %d-minute timeout limit. %s", int(timeout.Minutes()), err.Error())
+	signArgs := []string{"sign", "--apple-id", "--output", signedIpaPath, "--output-provision", provisionPath, "--udid", opts.UDID, "-u", opts.Account, "-p", opts.IpaPath}
+	if opts.RemoveExtensions {
+		signArgs = append(signArgs, "--remove-extensions")
+	}
+	if opts.RefreshMode {
+		t.WriteLog("Direct device refresh uses a full re-sign before tunnel install.\n")
+	}
+
+	if err := t.runCommand(ctx, true, "plumesign", signArgs...); err != nil {
+		return err
+	}
+	t.loadProvisioningProfile(provisionPath)
+
+	installArgs := []string{"install", "--host", directDevice.Host, "--identifier", directDevice.RemoteIdentifier, "--package", signedIpaPath}
+	if directDevice.TunnelPort > 0 {
+		installArgs = append(installArgs, "--tunnel-port", fmt.Sprintf("%d", directDevice.TunnelPort))
+	}
+
+	if err := t.runCommand(ctx, false, "appletvremote", installArgs...); err != nil {
+		t.updateDirectDeviceFromOutput()
+		return err
+	}
+	t.updateDirectDeviceFromOutput()
+
+	return nil
+}
+
+func (t *InstallManager) ensureAccountDeviceRegistered(account, udid, name string) error {
+	devices, err := GetAccountDevices(account)
+	if err == nil {
+		for _, device := range devices {
+			if strings.EqualFold(device.DeviceNumber, udid) {
+				return nil
+			}
 		}
-		return err
 	}
 
-	if err = cmd.Wait(); err != nil {
-		return err
+	if name == "" {
+		name = "Apple TV"
 	}
-
-	if provisionProfile, perr := model.ParseMobileProvisioningProfileFile(provisionPath); perr == nil {
-		t.ProvisioningProfile = provisionProfile
+	t.WriteLog(fmt.Sprintf("Registering device with Apple Developer account... %s\n", udid))
+	if err := RegisterAccountDevice(account, udid, name); err != nil {
+		return fmt.Errorf("register device failed: %w", err)
 	}
-
 	return nil
 }
 
@@ -227,6 +277,63 @@ func (t *InstallManager) SaveLog(id uint) {
 	if err := os.WriteFile(path, []byte(data), 0644); err != nil {
 		log.Error("write log failed :" + path)
 		return
+	}
+}
+
+func (t *InstallManager) runCommand(ctx context.Context, interactive bool, name string, args ...string) error {
+	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.Dir = app.Config.Server.DataDir
+	cmd.Env = GetRunEnvs()
+	cmd.Stdout = t.outputStdout
+	cmd.Stderr = t.outputStdout
+
+	if interactive {
+		stdin, err := cmd.StdinPipe()
+		if err != nil {
+			log.Err(err).Msg("Error creating stdin pipe: ")
+			return err
+		}
+		t.stdin = stdin
+		defer func() {
+			_ = stdin.Close()
+			if t.stdin == stdin {
+				t.stdin = nil
+			}
+		}()
+	} else {
+		t.stdin = nil
+	}
+
+	if err := cmd.Start(); err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			_ = cmd.Process.Kill()
+			log.Err(err).Msgf("Installation exceeded %d-minute timeout limit. %s", 30, t.ErrorLog())
+			return fmt.Errorf("Installation exceeded %d-minute timeout limit. %s", err.Error())
+		}
+		return err
+	}
+
+	return cmd.Wait()
+}
+
+func (t *InstallManager) loadProvisioningProfile(provisionPath string) {
+	if provisionProfile, err := model.ParseMobileProvisioningProfileFile(provisionPath); err == nil {
+		t.ProvisioningProfile = provisionProfile
+	}
+}
+
+func (t *InstallManager) updateDirectDeviceFromOutput() {
+	for _, line := range strings.Split(t.OutputLog(), "\n") {
+		if !strings.HasPrefix(line, directDeviceOutputPrefix) {
+			continue
+		}
+
+		var device model.DirectDevice
+		if err := json.Unmarshal([]byte(strings.TrimPrefix(line, directDeviceOutputPrefix)), &device); err != nil {
+			continue
+		}
+
+		UpsertDirectDevice(device)
 	}
 }
 

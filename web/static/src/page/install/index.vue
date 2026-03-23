@@ -211,10 +211,14 @@ export default {
       try {
         _this.log.output += `product type: ${_this.device.product_type}\n`;
         _this.log.output += `product version: ${_this.device.product_version}\n`;
-        let devmode = await api.checkDeveloperMode(_this.id);
-        _this.log.output += `developer mode: ${devmode.enabled ? "enabled" : "disabled"}${devmode.mounted ? " (mounted)" : ""}\n`;
-
-        await _this.checkAfcService(_this.id);
+        if (_this.isDirectDevice(_this.device)) {
+          _this.log.output += "developer mode: direct tunnel\n";
+          _this.log.output += "afc service: direct tunnel\n";
+        } else {
+          let devmode = await api.checkDeveloperMode(_this.id);
+          _this.log.output += `developer mode: ${devmode.enabled ? "enabled" : "disabled"}${devmode.mounted ? " (mounted)" : ""}\n`;
+          await _this.checkAfcService(_this.id);
+        }
 
         let formData = new FormData();
         for (let i = 0; i < _this.files.length; i++) {
@@ -395,6 +399,9 @@ export default {
       }
       return item.name && (item.name.toLowerCase().includes("iphone") || item.name.toLowerCase().includes("ipad"));
     },
+    isDirectDevice(item) {
+      return item && item.source === "direct";
+    },
   },
 };
 </script>
@@ -406,10 +413,9 @@ import WarningIcon from "@/assets/icons/warning.svg";
 import PersonIcon from "@/assets/icons/person.badge.plus.svg";
 import HelpIcon from "@/assets/icons/help.svg";
 </script>
-  
-  <style scoped>
+
+<style scoped>
 .line {
   text-align: center;
 }
 </style>
-  

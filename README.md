@@ -42,7 +42,7 @@ atvloadly is a web service that supports sideloading app on Apple TV. It uses [I
 
 > 😔 **Only supports Linux/OpenWrt systems, does not support Mac/Windows systems.**
 
-1. The Linux/OpenWrt host needs to install `avahi-deamon`.
+1. The Linux/OpenWrt host needs to install `avahi-deamon` if you want automatic Bonjour discovery.
    
    **OpenWrt：**
    ```
@@ -63,7 +63,7 @@ atvloadly is a web service that supports sideloading app on Apple TV. It uses [I
    docker run --privileged -d --name=atvloadly --restart=always -p 5533:80 -v /path/to/mount/dir:/data -v /var/run/dbus:/var/run/dbus -v /var/run/avahi-daemon:/var/run/avahi-daemon bitxeno/atvloadly:latest
    ```
 
-   The `/var/run/dbus` and `/var/run/avahi-daemon` of the host machine need to be shared with the docker container for use.
+   The `/var/run/dbus` and `/var/run/avahi-daemon` of the host machine need to be shared with the docker container for use when Bonjour discovery is enabled.
 
    If you want to use the HOST network and want to modify the listening port, you can add environment variables to container:
 
@@ -97,6 +97,15 @@ atvloadly is a web service that supports sideloading app on Apple TV. It uses [I
 4. After successful pairing, return to the home page, where the connected `AppleTV` will be displayed.
 5. Click on the connected `AppleTV` to enter the sideload installation page, select the IPA file that needs to be sideloaded, and click `Install`.
 
+### Direct IP / routed networks
+
+If Bonjour discovery is unavailable, you can still use the pairing-file import flow from `Preferences -> Laboratory`:
+
+1. Export a pairing file with `idevice_pair`.
+2. Enter the Apple TV device IP (for example a Tailscale IP).
+3. Upload the pairing file and import it.
+4. atvloadly will fall back to usbmuxd polling so the paired device can appear without Avahi discovery.
+
 ## FAQ
 
 1. How many apps can be installed with a free account?
@@ -106,6 +115,8 @@ atvloadly is a web service that supports sideloading app on Apple TV. It uses [I
 2. Unable to find AppleTV
 
 > Please turn off the VPN, restart the AppleTV, re-enter pairing mode, make sure **[Tool]** can detect devices of the `_apple-pairable._tcp` type, and pair again.
+
+> If you already have a pairing file, you can also go to **Preferences -> Laboratory** and import it with the Apple TV IP directly.
 
 3. Failed to log in to Apple account
 

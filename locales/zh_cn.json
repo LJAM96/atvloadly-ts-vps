@@ -58,7 +58,8 @@
             },
             "tips": {
                 "no_paired_devices": "没有连接设备",
-                "how_pair_device": "AppleTV 请转到『设置 -> 遥控器与设备 -> 遥控器App与设备』，进入配对模式完成配对"
+                "how_pair_device": "AppleTV 请转到『设置 -> 遥控器与设备 -> 遥控器App与设备』，进入配对模式完成配对",
+                "manual_pair": "使用直连 IP 导入 Pair 文件"
             }
         },
         "table": {
@@ -98,12 +99,16 @@
         "toast": {
             "pin_incorrect": "PIN码不正确",
             "pair_error": "配对出错，请到控制台查看详细信息",
-            "no_device_found": "找不到设备，请确认 usbmuxd 服务已启动"
+            "no_device_found": "找不到设备，请确认 usbmuxd 服务已启动",
+            "ip_required": "开始配对前请先输入设备 IP"
         },
         "step": {
             "start": {
                 "title": "开始",
                 "device": "设备",
+                "direct_ip": "设备 IP",
+                "direct_placeholder": "100.81.180.39",
+                "direct_hint": "请在 Apple TV 停留在“遥控器 App 与设备”页面时，填写它的局域网 IP 或 Tailscale IP。",
                 "button": "开始配对"
             },
             "pin": {
@@ -379,18 +384,22 @@
         }
     },
     "laboratory": {
-        "title": "连接 iPhone",
+        "title": "导入 Pair 文件",
         "tips": {
-            "step1": "请确保您的 iPhone 已开启开发者模式。",
-            "step2": "请下载 <a href=\"https://github.com/jkcoxson/idevice_pair\" target=\"_blank\" class=\"link\">idevice_pair</a> 并连接 iPhone，导出 Pairing File。",
-            "step3": "请使用 idevice_pair 开启 Wireless Debugging 功能。",
-            "step4": "请确保 <a href=\"/#/tools\" class=\"link\">工具</a> 中能发现您的 iPhone 设备。",
-            "step5": "iPhone 自动刷新不保证稳定性，iPhone 需要解锁后才能正常远程刷新。"
+            "step1": "请确保目标设备已经建立信任，并且可以进行无线配对或无线调试。",
+            "step2": "请下载 <a href=\"https://github.com/jkcoxson/idevice_pair\" target=\"_blank\" class=\"link\">idevice_pair</a>，先连接设备一次并导出 Pair 文件。",
+            "step3": "导入 Pair 文件前，需要先确保无线调试已经开启。",
+            "step4": "如果发现功能仍然可用，可以先在 <a href=\"/#/tools\" class=\"link\">工具</a> 页面确认设备。",
+            "step5": "手动 IP 导入适合 Tailscale 这类路由网络，但刷新和安装时设备仍然需要保持可达。"
         },
         "form": {
             "device_label": "选择对应设备",
             "device_placeholder": "请选择一个设备",
             "device_unlock": "iPhone 需要先解锁屏幕，才能被发现",
+            "manual_ip_label": "设备 IP / Tailscale IP",
+            "manual_ip_placeholder": "100.81.180.39",
+            "manual_ip_hint": "当发现功能不可用时可直接填写地址，导入时会用这个地址校验 Pair 文件。",
+            "direct_pair": "按 IP 配对",
             "refresh": "刷新",
             "refresh_devices": "刷新设备列表",
             "upload_label": "上传 Pair 文件",
@@ -399,7 +408,8 @@
         "toast": {
             "import_success": "导入成功",
             "import_failed": "导入失败: {{msg}}",
-            "load_devices_failed": "加载设备列表失败: {{msg}}"
+            "load_devices_failed": "加载设备列表失败: {{msg}}",
+            "device_required": "请先选择已发现设备或手动输入设备 IP"
         },
         "dialog": {
             "override": {

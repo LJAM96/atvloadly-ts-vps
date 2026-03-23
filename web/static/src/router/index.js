@@ -14,6 +14,17 @@ const routes = [
     ],
   },
   {
+    path: "/pair/direct",
+    component: () => import("@/page/layout.vue"),
+    children: [
+      {
+        path: "",
+        name: "pair-direct",
+        component: () => import("@/page/pair/index.vue"),
+      },
+    ],
+  },
+  {
     path: "/pair/:id",
     component: () => import("@/page/layout.vue"),
     children: [

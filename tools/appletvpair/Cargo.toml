@@ -1,0 +1,11 @@
+[package]
+name = "appletvpair"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0"
+clap = { version = "4.5", features = ["derive"] }
+idevice = { git = "https://github.com/bitxeno/idevice", branch = "wireless_pairing", default-features = false, features = ["aws-lc", "pair", "tcp", "usbmuxd"] }
+tokio = { version = "1.48", features = ["full"] }
+uuid = { version = "1.18", features = ["v4"] }

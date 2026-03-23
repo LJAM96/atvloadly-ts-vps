@@ -9,6 +9,7 @@ type Device struct {
 	IP             string       `json:"ip"`
 	MacAddr        string       `json:"mac_addr"`
 	UDID           string       `json:"udid"`
+	Source         string       `json:"source,omitempty"`
 	Status         DeviceStatus `json:"status"`
 	Enable         bool         `json:"enable"`
 	Message        string       `json:"message"`
@@ -39,6 +40,10 @@ const (
 	Unpaired DeviceStatus = "unpaired"
 	Paired   DeviceStatus = "paired"
 	Pairable DeviceStatus = "pairable"
+
+	DeviceSourceAvahi   = "avahi"
+	DeviceSourceDirect  = "direct"
+	DeviceSourceUsbmuxd = "usbmuxd"
 
 	DeviceClassiPhone  DeviceClass = "iPhone"
 	DeviceClassiPad    DeviceClass = "iPad"

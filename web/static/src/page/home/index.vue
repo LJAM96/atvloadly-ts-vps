@@ -69,6 +69,12 @@
             <div class="stat-title whitespace-normal text-sm content-center">
               {{ $t("home.sidebar.tips.how_pair_device") }}
             </div>
+            <router-link
+              class="link link-primary text-sm mt-2 text-center"
+              :to="{ name: 'pair-direct' }"
+            >
+              {{ $t("home.sidebar.tips.manual_pair") }}
+            </router-link>
           </div>
         </div>
       </div>

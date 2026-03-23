@@ -38,7 +38,6 @@
               <select
                 class="select select-bordered join-item flex-1 w-full"
                 v-model="selectedDeviceIp"
-                required
               >
                 <option value="" disabled>{{ $t("laboratory.form.device_placeholder") }}</option>
                 <option v-for="device in devices" :key="device.ip" :value="device.ip">
@@ -60,10 +59,31 @@
               <span class="label-text-alt">{{ $t("laboratory.form.device_unlock") }}</span>
             </label>
           </div>
+          <div class="form-control w-full">
+            <label class="label">
+              <span class="label-text">{{ $t("laboratory.form.manual_ip_label") }}</span>
+            </label>
+            <input
+              type="text"
+              class="input input-bordered w-full"
+              v-model.trim="manualDeviceIp"
+              :placeholder="$t('laboratory.form.manual_ip_placeholder')"
+            />
+            <label class="label">
+              <span class="label-text-alt">{{ $t("laboratory.form.manual_ip_hint") }}</span>
+            </label>
+          </div>
 
         </form>
 
         <div class="flex flex-row gap-x-4">
+          <button
+            class="btn btn-outline flex-1"
+            @click="goToDirectPair"
+            :disabled="loading"
+          >
+            {{ $t("laboratory.form.direct_pair") }}
+          </button>
           <button
             class="btn btn-primary flex-1"
             @click="onSubmit(false)"
@@ -102,12 +122,17 @@ export default {
       confirmDialogVisible: false,
       devices: [],
       selectedDeviceIp: "",
+      manualDeviceIp: "",
     };
   },
   mounted() {
+    this.manualDeviceIp = window.localStorage.getItem("laboratory.manualDeviceIp") || "";
     this.loadDevices();
   },
   methods: {
+    getTargetIP() {
+      return (this.manualDeviceIp || this.selectedDeviceIp || "").trim();
+    },
     async loadDevices() {
       this.loadingDevices = true;
       try {
@@ -138,6 +163,12 @@ export default {
       if (!this.validateForm("#form")) {
         return;
       }
+
+      const targetIP = this.getTargetIP();
+      if (!targetIP) {
+        toast.error(this.$t("laboratory.toast.device_required"));
+        return;
+      }
       
       this.loading = true;
       try {
@@ -148,14 +179,15 @@ export default {
         if (override) {
             formData.append("override", "true");
         }
-        if (this.selectedDeviceIp) {
-            formData.append("ip", this.selectedDeviceIp);
-        }
+        formData.append("ip", targetIP);
         
         await api.importPair(formData);
+        window.localStorage.setItem("laboratory.manualDeviceIp", targetIP);
         toast.success(this.$t("laboratory.toast.import_success"));
         document.getElementById("form").reset();
         this.files = [];
+        this.manualDeviceIp = targetIP;
+        this.selectedDeviceIp = "";
         this.confirmDialogVisible = false;
       } catch (error) {
         console.error(error);
@@ -165,6 +197,16 @@ export default {
       } finally {
         this.loading = false;
       }
+    },
+    goToDirectPair() {
+      const targetIP = this.getTargetIP();
+      if (!targetIP) {
+        toast.error(this.$t("laboratory.toast.device_required"));
+        return;
+      }
+
+      window.localStorage.setItem("pair.manualIp", targetIP);
+      this.$router.push({ name: "pair-direct", query: { ip: targetIP } });
     },
     onConfirmOverride() {
         this.onSubmit(true);

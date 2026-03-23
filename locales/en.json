@@ -58,7 +58,8 @@
             },
             "tips": {
                 "no_paired_devices": "No connected devices",
-                "how_pair_device": "For AppleTV, go to 'Settings -> Remotes and Devices -> Remote App and Devices' to enter pairing mode for completion"
+                "how_pair_device": "For AppleTV, go to 'Settings -> Remotes and Devices -> Remote App and Devices' to enter pairing mode for completion",
+                "manual_pair": "Use direct IP pairing-file import"
             }
         },
         "table": {
@@ -98,12 +99,16 @@
         "toast": {
             "pin_incorrect": "Incorrect PIN code",
             "pair_error": "Pairing error. Please check the console for more information.",
-            "no_device_found": "Device not found. Pleasemake sure the usbmuxd service is running."
+            "no_device_found": "Device not found. Please make sure the usbmuxd service is running.",
+            "ip_required": "Enter a device IP before starting pairing"
         },
         "step": {
             "start": {
                 "title": "Start",
                 "device": "Device",
+                "direct_ip": "Device IP",
+                "direct_placeholder": "100.81.180.39",
+                "direct_hint": "Use the Apple TV IP or Tailscale IP while it is showing the Remote App and Devices screen.",
                 "button": "Start Pairing"
             },
             "pin": {
@@ -379,18 +384,22 @@
         }
     },
     "laboratory": {
-        "title": "Connect iPhone",
+        "title": "Import Pair File",
         "tips": {
-            "step1": "Please ensure that Developer Mode is enabled on your iPhone.",
-            "step2": "Please download <a href=\"https://github.com/jkcoxson/idevice_pair\" target=\"_blank\" class=\"link\">idevice_pair</a>, connect your iPhone, and export the Pairing File.",
-            "step3": "Please use idevice_pair to enable Wireless Debugging functionality.",
-            "step4": "Please ensure that your iPhone device is discoverable in the <a href=\"/#/tools\" class=\"link\">Tools</a>.",
-            "step5": "Automatic refresh on iPhone is not guaranteed to be reliable; the iPhone must be unlocked for remote refresh to work properly."
+            "step1": "Please ensure that the target device is already trusted and ready for wireless pairing/debugging.",
+            "step2": "Please download <a href=\"https://github.com/jkcoxson/idevice_pair\" target=\"_blank\" class=\"link\">idevice_pair</a>, connect the device once, and export the Pairing File.",
+            "step3": "Wireless debugging must already be enabled before importing the Pair File.",
+            "step4": "If discovery is still available, you can confirm the device first in <a href=\"/#/tools\" class=\"link\">Tools</a>.",
+            "step5": "Manual IP import works well for routed networks such as Tailscale, but the device still needs to stay reachable for refresh/install operations."
         },
         "form": {
             "device_label": "Select Corresponding Device",
             "device_placeholder": "Please select a device",
             "device_unlock": "The iPhone must be unlocked to be discovered",
+            "manual_ip_label": "Device IP / Tailscale IP",
+            "manual_ip_placeholder": "100.81.180.39",
+            "manual_ip_hint": "Use this when discovery is unavailable. The imported pairing file will be validated against this address.",
+            "direct_pair": "Pair by IP",
             "refresh": "Refresh",
             "refresh_devices": "Refresh device list",
             "upload_label": "Upload Pair File",
@@ -399,7 +408,8 @@
         "toast": {
             "import_success": "Import successful",
             "import_failed": "Import failed: {{msg}}",
-            "load_devices_failed": "Failed to load device list: {{msg}}"
+            "load_devices_failed": "Failed to load device list: {{msg}}",
+            "device_required": "Select a discovered device or enter a device IP first"
         },
         "dialog": {
             "override": {

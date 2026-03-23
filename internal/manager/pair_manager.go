@@ -1,6 +1,7 @@
 package manager
 
 import (
+	"encoding/json"
 	"context"
 	"errors"
 	"fmt"
@@ -9,12 +10,16 @@ import (
 	"os/exec"
 	"regexp"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/bitxeno/atvloadly/internal/app"
 	"github.com/bitxeno/atvloadly/internal/log"
+	"github.com/bitxeno/atvloadly/internal/model"
 	"github.com/gookit/event"
 )
+
+const directDeviceOutputPrefix = "ATVLOADLY_DIRECT_DEVICE="
 
 type PairManager struct {
 	outputStdout *pairOutputWriter
@@ -36,14 +41,20 @@ func NewPairManager() *PairManager {
 	}
 }
 
-func (t *PairManager) Start(ctx context.Context, udid string) error {
+type PairOptions struct {
+	UDID string
+	IP   string
+}
+
+func (t *PairManager) Start(ctx context.Context, options PairOptions) error {
 	// set execute timeout 1 miniutes
 	timeout := time.Minute
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	t.cancel = cancel
 
-	cmd := exec.CommandContext(ctx, "idevicepair", "pair", "-u", udid, "-w")
+	cmd := t.newCommand(ctx, options)
 	cmd.Dir = app.Config.Server.DataDir
+	cmd.Env = GetRunEnvs()
 	cmd.Stdout = t.outputStdout
 	cmd.Stderr = t.outputStderr
 
@@ -66,8 +77,26 @@ func (t *PairManager) Start(ctx context.Context, udid string) error {
 	err = cmd.Wait()
 	if err != nil {
 		log.Err(err).Msgf("Error executing pair script. %s", t.ErrorLog())
+		return err
 	}
-	return err
+
+	if options.IP != "" {
+		if directDevice, parseErr := t.parseDirectDevice(); parseErr == nil {
+			UpsertDirectDevice(*directDevice)
+		} else {
+			return parseErr
+		}
+	}
+
+	return nil
+}
+
+func (t *PairManager) newCommand(ctx context.Context, options PairOptions) *exec.Cmd {
+	if options.IP != "" {
+		return exec.CommandContext(ctx, "appletvremote", "pair", "--host", options.IP)
+	}
+
+	return exec.CommandContext(ctx, "idevicepair", "pair", "-u", options.UDID, "-w")
 }
 
 func (t *PairManager) Close() {
@@ -88,6 +117,9 @@ func (t *PairManager) OnOutput(fn func(string)) {
 }
 
 func (t *PairManager) Write(p []byte) {
+	if t.stdin == nil {
+		return
+	}
 	_, _ = t.stdin.Write(p)
 }
 
@@ -120,6 +152,22 @@ func (w *pairOutputWriter) Write(p []byte) (n int, err error) {
 
 func (w *pairOutputWriter) String() string {
 	return string(w.data)
+}
+
+func (t *PairManager) parseDirectDevice() (*model.DirectDevice, error) {
+	for _, line := range strings.Split(t.OutputLog(), "\n") {
+		if !strings.HasPrefix(line, directDeviceOutputPrefix) {
+			continue
+		}
+
+		var device model.DirectDevice
+		if err := json.Unmarshal([]byte(strings.TrimPrefix(line, directDeviceOutputPrefix)), &device); err != nil {
+			return nil, fmt.Errorf("failed to decode direct device metadata: %w", err)
+		}
+		return &device, nil
+	}
+
+	return nil, errors.New("direct device metadata not found in pairing output")
 }
 
 func ImportPairingFile(ip string, data []byte, override bool) error {

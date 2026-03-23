@@ -112,3 +112,13 @@ func (am *AccountManager) DeleteAccountDevice(email, deviceID string) error {
 	}
 	return nil
 }
+
+func (am *AccountManager) RegisterAccountDevice(email, udid, name string) error {
+	args := []string{"account", "register-device", "-u", email, "--udid", udid, "-n", name}
+	_, err := ExecuteCommand("plumesign", args...)
+	if err != nil {
+		log.Err(err).Msgf("Error registering device %s for %s", udid, email)
+		return err
+	}
+	return nil
+}

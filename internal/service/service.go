@@ -127,6 +127,9 @@ func CheckDeveloperMode(ctx context.Context, id string) (bool, error) {
 	if !ok {
 		return false, fmt.Errorf("device not found: %s", id)
 	}
+	if device.Source == model.DeviceSourceDirect {
+		return true, nil
+	}
 
 	return manager.CheckDeveloperMode(device.UDID)
 }
@@ -135,6 +138,9 @@ func CheckAfcService(ctx context.Context, id string) error {
 	device, ok := manager.GetDeviceByID(id)
 	if !ok {
 		return fmt.Errorf("device not found: %s", id)
+	}
+	if device.Source == model.DeviceSourceDirect {
+		return nil
 	}
 
 	var err error

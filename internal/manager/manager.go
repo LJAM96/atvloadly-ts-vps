@@ -34,7 +34,7 @@ func GetDevices() ([]model.Device, error) {
 
 func GetDeviceByID(id string) (*model.Device, bool) {
 	device, found := deviceManager.GetDeviceByID(id)
-	if found {
+	if found && device.Source != model.DeviceSourceDirect {
 		if devInfo, err := GetDeviceInfo(device.UDID); err == nil {
 			deviceManager.AppendProductInfo(device, *devInfo)
 		}
@@ -44,7 +44,7 @@ func GetDeviceByID(id string) (*model.Device, bool) {
 
 func GetDeviceByUDID(udid string) (*model.Device, bool) {
 	device, found := deviceManager.GetDeviceByUDID(udid)
-	if found {
+	if found && device.Source != model.DeviceSourceDirect {
 		if devInfo, err := GetDeviceInfo(device.UDID); err == nil {
 			deviceManager.AppendProductInfo(device, *devInfo)
 		}
@@ -117,6 +117,10 @@ func GetAccountDevices(email string) ([]model.AccountDevice, error) {
 
 func DeleteAccountDevice(email, deviceID string) error {
 	return accountManager.DeleteAccountDevice(email, deviceID)
+}
+
+func RegisterAccountDevice(email, udid, name string) error {
+	return accountManager.RegisterAccountDevice(email, udid, name)
 }
 
 func GetCertificates(email string) ([]model.Certificate, error) {

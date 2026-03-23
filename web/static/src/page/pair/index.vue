@@ -12,15 +12,34 @@
 
     <div class="border rounded p-6 bg-base-100">
       <div v-show="active === 0" class="flex flex-col gap-y-4">
-        <p>
-          <label class="inline-block w-16"
-            >{{ $t("pair.step.start.device") }}：</label
-          >{{ device.name }}
-        </p>
-        <p><label class="inline-block w-16">IP：</label>{{ device.ip }}</p>
-        <p>
-          <label class="inline-block w-16">MAC：</label>{{ device.mac_addr }}
-        </p>
+        <template v-if="directMode">
+          <div class="form-control w-full">
+            <label class="label">
+              <span class="label-text">{{ $t("pair.step.start.direct_ip") }}</span>
+            </label>
+            <input
+              ref="ipInput"
+              type="text"
+              class="input input-bordered input-primary w-full"
+              v-model.trim="manualIp"
+              :placeholder="$t('pair.step.start.direct_placeholder')"
+            />
+            <label class="label">
+              <span class="label-text-alt">{{ $t("pair.step.start.direct_hint") }}</span>
+            </label>
+          </div>
+        </template>
+        <template v-else>
+          <p>
+            <label class="inline-block w-16"
+              >{{ $t("pair.step.start.device") }}：</label
+            >{{ device.name }}
+          </p>
+          <p><label class="inline-block w-16">IP：</label>{{ device.ip }}</p>
+          <p>
+            <label class="inline-block w-16">MAC：</label>{{ device.mac_addr }}
+          </p>
+        </template>
         <button class="btn btn-primary" @click="start">
           {{ $t("pair.step.start.button") }}
         </button>
@@ -75,7 +94,9 @@ export default {
       active: 0,
       pin: "",
       loading: false,
+      directMode: false,
       id: "",
+      manualIp: "",
       device: {},
       cmd: {
         output: "",
@@ -89,10 +110,14 @@ export default {
     };
   },
   created() {
-    this.id = this.$route.params.id;
+    this.id = this.$route.params.id || "";
+    this.directMode = !this.id;
+    this.manualIp = (this.$route.query.ip || window.localStorage.getItem("pair.manualIp") || "").trim();
 
     this.initWebSocket();
-    this.fetchData();
+    if (!this.directMode) {
+      this.fetchData();
+    }
   },
   methods: {
     fetchData() {
@@ -103,8 +128,24 @@ export default {
     },
     start() {
       let _this = this;
-      _this.active = 1;
+      if (_this.directMode) {
+        const ip = _this.manualIp.trim();
+        if (!ip) {
+          toast.error(this.$t("pair.toast.ip_required"));
+          _this.$nextTick(() => {
+            _this.$refs.ipInput?.focus();
+          });
+          return;
+        }
 
+        window.localStorage.setItem("pair.manualIp", ip);
+        _this.active = 1;
+        _this.loading = true;
+        _this.websocketsend(3, ip);
+        return;
+      }
+
+      _this.active = 1;
       _this.loading = true;
       const uuid = _this.device.udid;
       _this.websocketsend(1, uuid);
@@ -212,10 +253,8 @@ export default {
 import CheckMarkIcon from "@/assets/icons/checkmark.svg";
 </script>
 
-  
-  <style scoped>
+<style scoped>
 .line {
   text-align: center;
 }
 </style>
-  

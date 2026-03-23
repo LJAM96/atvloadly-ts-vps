@@ -146,13 +146,20 @@ func (dm *DeviceManager) SaveDevice(dev model.Device) {
 	dm.devices.Store(dev.UDID, dev)
 }
 
+func (dm *DeviceManager) syncDirectDevices() {
+	for _, directDevice := range GetDirectDevices() {
+		dm.SaveDevice(directDevice.ToDevice())
+	}
+}
+
 func (dm *DeviceManager) DeleteDevice(udid string) {
 	dm.devices.Delete(udid)
 }
 
 func (dm *DeviceManager) DeleteDeviceByMacAddr(macAddr string) {
 	dm.devices.Range(func(k, v any) bool {
-		if v.(model.Device).MacAddr == macAddr {
+		dev := v.(model.Device)
+		if dev.MacAddr == macAddr && dev.Source != model.DeviceSourceUsbmuxd {
 			dm.devices.Delete(k)
 			return false
 		}

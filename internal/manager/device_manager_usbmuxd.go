@@ -29,6 +29,7 @@ func (dm *DeviceManager) Start() {
 	ctx := dm.ctx
 	dm.mu.Unlock()
 
+	dm.syncDirectDevices()
 	umx, err := gidevice.NewUsbmux()
 	if err != nil {
 		log.Err(err).Msg("Cannot connect to usbmuxd")
